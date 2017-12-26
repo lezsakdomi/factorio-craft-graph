@@ -28,7 +28,7 @@ Implemented values:
   - dot
 """
 
-factoriodir = './Downloads/factorio' # Assuming we are in ~
+factoriodir = '.' # Assuming we are in the factorio directory
 
 def proccontents(contents, title):
     item_match = re.search(r"^Infobox:(?P<name>[\w\s\d\.-]+)$", title) # Shouldn't contain " (research)".
