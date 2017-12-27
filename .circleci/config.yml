@@ -1,0 +1,167 @@
+defaults: &defaults
+  working_directory: ~/repo
+  docker:
+    - image: circleci/python:latest
+  environment: &default_env
+    IMAGE_FORMAT: png # By default, an SVG is built, but it contains local links
+    DATA_FORMAT: dot # It's the default, but we'll use it later, so do not change
+    GRAPHER: dot # This is the default
+
+# Python CircleCI 2.0 configuration file
+#
+# Check https://circleci.com/docs/2.0/language-python/ for more details
+#
+version: 2
+jobs:
+  build: &build
+    <<: *defaults
+
+    steps:
+      - checkout
+
+      # Download and cache dependencies
+      - restore_cache:
+          key: v0.1-dependencies
+
+      - run:
+          name: install dependencies
+          command: |
+            sudo apt-get update -qq
+            sudo apt-get install -yq graphviz
+            make factorio
+
+      - save_cache:
+          paths:
+            - ./factorio
+          key: v0.1-dependencies
+        
+      - run:
+          name: build
+          command: make PREFERRED_FORMAT=$IMAGE_FORMAT DOT_TOOL=$GRAPHER
+
+      - store_artifacts:
+          path: graph.$IMAGE_FORMAT
+          destination: factorio-craft-tree-$GRAPHER.$IMAGE_FORMAT
+  
+  build-pdf:
+    <<: *build
+    environment:
+      <<: *default_env
+      IMAGE_FORMAT: pdf
+  
+  build-neato:
+    <<: *build
+    environment:
+      <<: *default_env
+      GRAPHER: neato
+  
+  build-twopi:
+    <<: *build
+    environment:
+      <<: *default_env
+      GRAPHER: twopi
+  
+  build-circo:
+    <<: *build
+    environment:
+      <<: *default_env
+      GRAPHER: circo
+  
+  build-fdp:
+    <<: *build
+    environment:
+      <<: *default_env
+      GRAPHER: fdp
+  
+  build-sfdp:
+    <<: *build
+    environment:
+      <<: *default_env
+      GRAPHER: sfdp
+
+
+  generate: &generate
+    <<: *defaults
+    steps:
+      - checkout
+      - restore-cache:
+          keys:
+            - v0.1-factorio
+      - run:
+          name: Download factorio
+          command: make factorio
+      - save-cache:
+          key: v0.1-factorio
+          paths:
+            - factorio
+      - run:
+          name: Build
+          command: make data.$DATA_FORMAT
+      - persist_to_workspace:
+          root: ~/repo
+          paths: .
+
+  render: &render
+    <<: *defaults
+    steps:
+      - run:
+          name: Install dependencies
+          command: sudo apt-get update -qq && sudo apt-get install -yq graphviz
+      - attach_workspace:
+          at: ~/repo
+      - run:
+          name: Render graph
+          command: make graph.$IMAGE_FORMAT DOT_TOOL=$GRAPHER
+      - store_artifacts:
+          path: graph.*
+
+  render-pdf:
+    <<: *render
+    environment:
+      <<: *default_env
+      IMAGE_FORMAT: pdf
+  
+  render-with-neato:
+    <<: *render
+    environment:
+      <<: *default_env
+      GRAPHER: neato
+  
+  render-with-twopi:
+    <<: *render
+    environment:
+      <<: *default_env
+      GRAPHER: twopi
+  
+  render-with-circo:
+    <<: *render
+    environment:
+      <<: *default_env
+      GRAPHER: circo
+  
+  render-with-fdp:
+    <<: *render
+    environment:
+      <<: *default_env
+      GRAPHER: fdp
+  
+  render-with-sfdp:
+    <<: *render
+    environment:
+      <<: *default_env
+      GRAPHER: sfdp
+
+workflows:
+  version: 2
+  build:
+    jobs:
+      - generate
+      - render: &render-workflow-job
+          requires:
+            - generate
+      - render-pdf: *render-workflow-job
+      - render-with-neato: *render-workflow-job
+      - render-with-twopi: *render-workflow-job
+      - render-with-circo: *render-workflow-job
+      - render-with-fdp: *render-workflow-job
+      #- render-with-sfdp: *render-workflow-job

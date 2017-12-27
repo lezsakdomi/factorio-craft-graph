@@ -8,11 +8,30 @@ import json
 from urllib import request
 import re
 from colorsys import hsv_to_rgb
+from argparse import ArgumentParser
 
-query = "https://wiki.factorio.com/api.php?action=query&generator=prefixsearch&gpssearch=:Infobox:&prop=revisions&rvprop=content"
-# A valid WikiMedia API request
+parser = ArgumentParser(description="Crawl the infoboxes at Factorio wiki and output them pretty-formatted")
+parser.add_argument('--format', '-f', '--form', metavar='FORMAT', type=str, default='dot', choices=['md', 'markdown', 'tsv', 'dot'],
+        help="Output format (markdown/tsv/dot). 'md' is a shorthand for 'markdown'.")
+parser.add_argument('--factorio', '--dir', '-d', metavar='DIR', type=str, default=".", dest='factoriodir',
+        help="Path to factorio installation directory. Should be a relative path or things would broke. Defaults to current dir, but permitted to be invalid")
+parser.add_argument('--wiki', metavar='URL', type=str, default="https://wiki.factorio.com",
+        help="The wiki url base, used for clickable links (default: official factorio wiki)")
+parser.add_argument('--api', metavar='URL', type=str, default="https://wiki.factorio.com/api.php",
+        help="A valid WikiMedia API endpoint. Defaults to wiki.factorio.com's")
+parser.add_argument('--query', '--params', '-p', type=str, default="action=query&generator=prefixsearch&gpssearch=:Infobox:&prop=revisions&rvprop=content",
+        help="The parameters to pass to the api initially, in URI encoded format. Do not touch unless you read the source through!")
+parser.add_argument('--verbose', '-v', action='count', dest='verbosity', default=0,
+        help="Increase verbosity")
+parser.add_argument('--silent', '-s', action='store_const', const=-1, dest='verbosity',
+        help="Hide warnings (show errors only)")
+parser.add_argument('--quiet', action='store_const', const=-2, dest='verbosity',
+        help="Don't show anything at all, hide even errors (not guaranteed)")
+args = parser.parse_args()
 
-severity = 4
+query = args.api+'?'+args.query
+
+severity = args.verbosity + 2
 """
 1 - Error
 2 - Warning
@@ -20,7 +39,8 @@ severity = 4
 4 - Debug
 """
 
-form = 'dot'
+form = args.format
+if form == 'md': form = 'markdown'
 """
 Implemented values:
   - markdown
@@ -28,7 +48,7 @@ Implemented values:
   - dot
 """
 
-factoriodir = '.' # Assuming we are in the factorio directory
+factoriodir = args.factoriodir
 
 def proccontents(contents, title):
     item_match = re.search(r"^Infobox:(?P<name>[\w\s\d\.-]+)$", title) # Shouldn't contain " (research)".
@@ -80,7 +100,7 @@ def proccontents(contents, title):
                     random.seed(ingredient)
                     r, g, b = hsv_to_rgb(random.random(), 1, 0.5);
                     print('      "{ingredient}" -> "{item}" [label={amount},weight={weight},color="{color}"];'.
-                            format(item=item, ingredient=ingredient, amount=amount, weight=1/int(amount), color=("#%02X%02X%02X" % (r*0xFF, g*0xFF, b*0xFF))))
+                            format(item=item, ingredient=ingredient, amount=amount, weight=1/int(amount), color=("#%02X%02X%02X" % (int(r*0xFF), int(g*0xFF), int(b*0xFF)))))
             if form == 'markdown': print("- Product: "+item)
             if form == 'markdown': print()
         else:
